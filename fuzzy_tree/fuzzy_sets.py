@@ -67,12 +67,15 @@ def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
     n_sets = len(points) - 1
     
     # Nomi linguistici degli insiemi fuzzy
+    linguistic_terms_7 = ["EXTREMELY LOW", "VERY LOW", "LOW", "MEDIUM", "HIGH", "VERY HIGH", "EXTREMELY HIGH"]
     linguistic_terms_5 = ["VERY_LOW", "LOW", "MEDIUM", "HIGH", "VERY_HIGH"]
     linguistic_terms_3 = ["LOW","MEDIUM","HIGH"]
     linguistic_terms_2 = ["LOW","HIGH"]
 
     # Seleziona i termini linguistici appropriati in base al numero di insiemi
-    if n_sets == 5:
+    if n_sets == 7:
+        linguistic_terms = linguistic_terms_7
+    elif n_sets == 5:
         linguistic_terms = linguistic_terms_5
     elif n_sets == 3:
         linguistic_terms = linguistic_terms_3
