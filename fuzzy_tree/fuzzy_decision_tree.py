@@ -11,15 +11,12 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score
 
-from fuzzy_node import FuzzyNode
-from fuzzy_sets import FuzzyDiscretizer, create_triangular_fuzzy_sets
+from fuzzy_tree.fuzzy_node import FuzzyNode
+from fuzzy_tree.fuzzy_sets import FuzzyDiscretizer, create_triangular_fuzzy_sets
 
 class FuzzyDecisionTree:
     """
     Implementazione di un albero decisionale fuzzy per classificazione.
-    
-    Utilizza insiemi fuzzy per creare split "sfumati" anziché netti, consentendo
-    un'appartenenza parziale dei campioni a più nodi dell'albero.
     """
     
     def __init__(self, 
@@ -28,7 +25,8 @@ class FuzzyDecisionTree:
                  min_samples_split: int = 2,
                  min_samples_leaf: int = 1,
                  gain_threshold: float = 0.001,
-                 membership_threshold: float = 0.5):
+                 membership_threshold: float = 0.5,
+                 prediction_policy: str = "max_matching"):  # Nuovo parametro
         """
         Inizializza il classificatore fuzzy decision tree
         
@@ -39,6 +37,7 @@ class FuzzyDecisionTree:
             min_samples_leaf: Numero minimo di campioni per un nodo foglia
             gain_threshold: Guadagno informativo minimo per effettuare uno split
             membership_threshold: Soglia minima di appartenenza per considerare un esempio
+            prediction_policy: Politica di predizione ('max_matching' o 'weighted')
         """
         # Validazione dei parametri
         if num_fuzzy_sets <= 0:
@@ -46,14 +45,18 @@ class FuzzyDecisionTree:
         if membership_threshold < 0 or membership_threshold > 1:
             raise ValueError("membership_threshold deve essere nell'intervallo [0,1]")
         
-        self.num_fuzzy_sets = num_fuzzy_sets
-
+        # Verificare che la policy di predizione sia valida
+        valid_policies = ["max_matching", "weighted"]
+        if prediction_policy not in valid_policies:
+            raise ValueError(f"prediction_policy deve essere uno di {valid_policies}")
+        
         self.num_fuzzy_sets = num_fuzzy_sets
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
         self.gain_threshold = gain_threshold
         self.membership_threshold = membership_threshold
+        self.prediction_policy = prediction_policy  # Nuova proprietà
         
         # Inizializziamo l'albero
         self.root = None
@@ -125,9 +128,9 @@ class FuzzyDecisionTree:
         splits = discretizer.run(X, features_to_discretize)
         
         # Creiamo gli insiemi fuzzy per ogni feature
-        self.fuzzy_sets = {}
+        self.fuzzy_sets = {}  #dict
         for i in range(self.n_features):
-            if len(splits[i]) > 0:
+            if len(splits[i]) > 0:  #if there are splits in the feature
                 self.fuzzy_sets[i] = create_triangular_fuzzy_sets(splits[i])
             else:
                 self.fuzzy_sets[i] = []
@@ -148,10 +151,10 @@ class FuzzyDecisionTree:
             node.mark_as_leaf(class_distribution)
             return
 
-        n_samples = X.shape[0]
+        n_samples = X.shape[0]   #quanti esempi raggiungono questo nodo
         node.samples_count = n_samples
         
-        # Controllo dei criteri di arresto
+        # Controllo dei criteri di arresto specificati all'inizio
         if (self.max_depth is not None and depth >= self.max_depth) or \
         n_samples < self.min_samples_split or \
         len(np.unique(y)) == 1:
@@ -162,6 +165,11 @@ class FuzzyDecisionTree:
             
         # Troviamo il migliore split
         best_feature, best_gain = self._find_best_split(X, y)
+
+
+        #-----------attualmente non c'è un controllo per impedire la stessa feature in nodi diversi ------------
+
+
         
         # Se non troviamo uno split valido, creiamo una foglia
         if best_feature is None or best_gain <= self.gain_threshold:
@@ -199,7 +207,7 @@ class FuzzyDecisionTree:
                 fuzzy_set.get_value(x[best_feature]) for x in X
             ])
             
-            # Filtriamo gli esempi con appartenenza sopra la soglia
+            # Filtriamo gli esempi con appartenenza sopra la soglia (default è 0.5)
             valid_samples = membership_degrees >= self.membership_threshold
             X_child = X[valid_samples]
             y_child = y[valid_samples]
@@ -290,7 +298,8 @@ class FuzzyDecisionTree:
         if total_membership == 0:
             return 0
         
-        entropy = 0
+        entropy = 0 #inizializzazione
+
         for c in classes:
             class_membership = np.sum(membership_degrees[y == c])
             if class_membership > 0:
@@ -320,7 +329,8 @@ class FuzzyDecisionTree:
         weighted_entropy = 0
         total_samples = len(y)
         
-        for fuzzy_set in self.fuzzy_sets[feature]:
+        for fuzzy_set in self.fuzzy_sets[feature]:  #per ogni insieme fuzzy associato alla feature da analizzare...
+
             # Calcolo dei gradi di appartenenza per questo insieme fuzzy
             membership_degrees = np.array([
                 fuzzy_set.get_value(x[feature]) for x in X
@@ -370,16 +380,20 @@ class FuzzyDecisionTree:
         if self.root is None:
             raise ValueError("L'albero non è stato addestrato")
         
-        if len(X.shape) ==1:
-            X=X.reshape(1,-1)
+        #Se l'input ha un solo esempio, lo riformattiamo come una matrice con una sola riga
+        if len(X.shape) == 1:
+            X = X.reshape(1,-1)
             
-        # Frammentare le predizioni per batch con dataset molto grandi
+        # Frammentaiamo le predizioni per batch con dataset molto grandi
         batch_size = 10000  # Scelto arbitrariamente
         if len(X) > batch_size:
             predictions = []
             for i in range(0, len(X), batch_size):
                 batch = X[i:i+batch_size]
-                batch_preds = np.array([self.predict(sample.reshape(1, -1))[0] for sample in batch])
+                batch_preds = np.zeros(len(batch), dtype=int)
+                batch_probas = self.predict_proba(batch)
+                batch_preds = np.argmax(batch_probas, axis=1)
+                
                 predictions.append(batch_preds)
             return np.concatenate(predictions)
         
@@ -402,10 +416,15 @@ class FuzzyDecisionTree:
         if len(X.shape) == 1:
             # Singolo esempio
             X = X.reshape(1, -1)
+
+             
+        #Verifichiamo le dimensioni
+        if X.shape[1] != self.n_features:
+            raise ValueError(f"Numero di feature errato: atteso {self.n_features}, ricevuto {X.shape[1]}")
             
         probas = []
         for sample in X:
-            # Trova il percorso con attivazione massima
+            # predict_single_example trova il percorso con attivazione massima e restituisce la distribuzione della foglia risultante
             _, class_distribution = self._predict_single_example(sample, self.root)
             probas.append(class_distribution)
             
@@ -413,7 +432,7 @@ class FuzzyDecisionTree:
     
     def _predict_single_example(self, x: np.ndarray, node: FuzzyNode, current_activation: float = 1.0) -> Tuple[float, np.ndarray]:
         """
-        Trova il percorso con attivazione massima per un singolo esempio usando maximum matching
+        Dispatcher per il metodo di predizione appropriato in base alla policy
         
         Args:
             x: Vettore delle feature
@@ -423,14 +442,33 @@ class FuzzyDecisionTree:
         Returns:
             Una tupla (max_activation, best_leaf_distribution)
         """
-        # Stabilità numerica: gestione di valori estremi
-        x = np.clip(x, 1e-10, 1.0 - 1e-10)  # Evita valori troppo vicini a 0 o 1
+        if self.prediction_policy == "max_matching":
+            return self._predict_max_matching(x, node, current_activation)
+        elif self.prediction_policy == "weighted":
+            return self._predict_weighted(x, node, current_activation)
+        else:
+            # Di default usiamo max_matching
+            return self._predict_max_matching(x, node, current_activation)
+    
+    def _predict_max_matching(self, x: np.ndarray, node: FuzzyNode, current_activation: float = 1.0) -> Tuple[float, np.ndarray]:
+        """
+        Trova il percorso con attivazione massima per un singolo esempio (maximum matching policy)
+        
+        Args:
+            x: Vettore delle feature
+            node: Nodo corrente
+            current_activation: Attivazione accumulata fino a questo nodo
+            
+        Returns:
+            Una tupla (max_activation, best_leaf_distribution)
+        """
+        
 
         # Caso base: nodo foglia
         if node.is_leaf:
             return current_activation, node.class_distribution
             
-        # Se il nodo non ha figli, trattiamolo come una foglia con distribuzione uniforme
+        # Se il nodo non ha figli, trattiamolo come una foglia con distribuzione uniforme (caso raro)
         if len(node.children) == 0:
             return current_activation, np.ones(self.n_classes) / self.n_classes
             
@@ -441,14 +479,17 @@ class FuzzyDecisionTree:
         for child in node.children:
             # Calcola il grado di appartenenza a questo insieme fuzzy
             membership = child.fuzzy_set.get_value(x[node.feature])
+
+            membership = np.clip(membership, 1e-10, 1.0)
             
             # Calcola l'attivazione di questo ramo (usando il prodotto come t-norm per AND)
             branch_activation = current_activation * membership
+
             
             # Se l'attivazione è significativa, esplora questo ramo
             if branch_activation > 0:
                 # Chiamata ricorsiva
-                child_activation, child_distribution = self._predict_single_example(
+                child_activation, child_distribution = self._predict_max_matching(
                     x, child, branch_activation
                 )
                 
@@ -467,6 +508,64 @@ class FuzzyDecisionTree:
                 return 0.0, np.ones(self.n_classes) / self.n_classes
         
         return max_activation, best_leaf_distribution
+    
+    def _predict_weighted(self, x: np.ndarray, node: FuzzyNode, current_activation: float = 1.0) -> Tuple[float, np.ndarray]:
+        """
+        Combina le predizioni di tutti i percorsi proporzionalmente alla loro attivazione
+        
+        Args:
+            x: Vettore delle feature
+            node: Nodo corrente
+            current_activation: Attivazione accumulata fino a questo nodo
+            
+        Returns:
+            Una tupla (total_activation, weighted_distribution)
+        """
+        
+
+        # Caso base: nodo foglia
+        if node.is_leaf:
+            return current_activation, node.class_distribution
+            
+        # Se il nodo non ha figli, trattiamolo come una foglia con distribuzione uniforme
+        if len(node.children) == 0:
+            return current_activation, np.ones(self.n_classes) / self.n_classes
+            
+        # Accumulatori per la combinazione pesata
+        total_activation = 0.0
+        combined_distribution = np.zeros(self.n_classes)
+        
+        # Esplora tutti i figli con attivazione > 0
+        for child in node.children:
+            # Calcola il grado di appartenenza a questo insieme fuzzy
+            membership = child.fuzzy_set.get_value(x[node.feature])
+            
+            membership = np.clip(membership, 1e-10, 1.0)
+
+            # Calcola l'attivazione di questo ramo
+            branch_activation = current_activation * membership
+            
+            # Se l'attivazione è significativa, esplora questo ramo
+            if branch_activation > 0:
+                child_activation, child_distribution = self._predict_weighted(
+                    x, child, branch_activation
+                )
+                
+                # Aggiungi questa distribuzione pesata per l'attivazione
+                combined_distribution += child_activation * child_distribution
+                total_activation += child_activation
+        
+        # Normalizza la distribuzione combinata
+        if total_activation > 0:
+            combined_distribution /= total_activation
+        else:
+            # Se nessun percorso ha attivazione > 0, usa la distribuzione a priori
+            if hasattr(self, 'y_train'):
+                combined_distribution = self._compute_class_distribution(self.y_train)
+            else:
+                combined_distribution = np.ones(self.n_classes) / self.n_classes
+            
+        return total_activation, combined_distribution
     
     def extract_rules(self) -> List[Dict]:
         """
@@ -488,24 +587,19 @@ class FuzzyDecisionTree:
             path: Percorso corrente (lista di tuple (feature, fuzzy_set))
             rules: Lista di regole (modificata in-place)
         """
+        #caso limite
+
         if node.is_leaf:
             # Creiamo una regola per questo percorso
             predicted_class = np.argmax(node.class_distribution)
             confidence = node.class_distribution[predicted_class]
             
-            # Calcoliamo l'attivazione minima di questa regola
-            min_activation = 1.0
-            for _, _, fuzzy_set in path:
-                # Per calcolare l'attivazione minima teorica, consideriamo il valore massimo del grado di appartenenza
-                max_membership = 1.0  # Per insiemi triangolari, il valore massimo è sempre 1
-                min_activation *= max_membership
             
             rule = {
                 'antecedent': path.copy(),
                 'consequent': predicted_class,
                 'class_name': self.class_names[predicted_class] if predicted_class < len(self.class_names) else f"Class_{predicted_class}",
                 'confidence': confidence,
-                'min_activation': min_activation,  # Aggiungiamo questo nuovo campo
                 'class_distribution': node.class_distribution.copy()
             }
             rules.append(rule)
@@ -538,8 +632,8 @@ class FuzzyDecisionTree:
                 for j, (feature_idx, feature_name, fuzzy_set) in enumerate(rule['antecedent']):
                     if j > 0:
                         print(" E ", end="")
-                    # Modifica questa riga - aggiungi controllo
-                    fuzzy_term = fuzzy_set.term if hasattr(fuzzy_set, 'term') else str(fuzzy_set)
+                    
+                    fuzzy_term = FuzzyDecisionTree.extract_term(fuzzy_set)
                     print(f"{feature_name} È {fuzzy_term}", end="")
             else:
                 print("  SE (radice)", end="")
@@ -550,6 +644,26 @@ class FuzzyDecisionTree:
             print(f" ALLORA classe = {class_name} (confidenza: {confidence:.2f})")
             
             print()
+
+
+    @staticmethod
+    def extract_term(fuzzy_set):
+        """Estrae il termine linguistico da un insieme fuzzy"""
+        # Prima prova ad accedere all'attributo term direttamente
+        if hasattr(fuzzy_set, 'term'):
+            return fuzzy_set.term
+        
+        # Se fallisce, prova a estrarlo dalla rappresentazione in stringa
+        str_rep = str(fuzzy_set)
+        if "term='" in str_rep:
+            # Estrai il valore tra term=' e il successivo '
+            start = str_rep.find("term='") + 6
+            end = str_rep.find("'", start)
+            if end > start:
+                return str_rep[start:end]
+        
+        # In caso di fallimento, restituisci la rappresentazione in stringa
+        return str_rep
     
     def evaluate(self, X: np.ndarray, y: np.ndarray) -> Dict[str, float]:
         """
@@ -623,8 +737,7 @@ class FuzzyDecisionTree:
         for i, child in enumerate(node.children):
             is_last_child = (i == len(node.children) - 1)
             if child.fuzzy_set:
-                # Modifica questa riga
-                fuzzy_term = child.fuzzy_set.term if hasattr(child.fuzzy_set, 'term') else str(child.fuzzy_set)
-                print(f"{prefix}{extension}│")
+                fuzzy_term = FuzzyDecisionTree.extract_term(child.fuzzy_set)
                 print(f"{prefix}{extension}└── È {fuzzy_term}")
+                print(f"{prefix}{extension}│")
             self._visualize_recursive(child, prefix + extension, is_last_child, depth + 1, max_depth)
