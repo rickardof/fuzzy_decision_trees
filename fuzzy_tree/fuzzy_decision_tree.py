@@ -741,3 +741,299 @@ class FuzzyDecisionTree:
                 print(f"{prefix}{extension}└── È {fuzzy_term}")
                 print(f"{prefix}{extension}│")
             self._visualize_recursive(child, prefix + extension, is_last_child, depth + 1, max_depth)
+
+
+
+    def plot_tree(self, figsize=(15, 10), dpi=100, fontsize=9):
+        """
+        Visualizza graficamente l'albero decisionale fuzzy utilizzando matplotlib
+        
+        Args:
+            figsize: Dimensione della figura (larghezza, altezza) in pollici
+            dpi: Risoluzione in dots per inch
+            fontsize: Dimensione del font per le etichette
+        """
+        if self.root is None:
+            print("L'albero non è stato addestrato")
+            return
+            
+        # Adattiamo la dimensione della figura in base alla complessità dell'albero
+        max_depth = self._get_max_depth(self.root)
+        total_leaves = self._count_leaves(self.root)
+        
+        # Aumentiamo la dimensione della figura per alberi più complessi
+        adjusted_height = max(15, max_depth * 2.5)
+        adjusted_width = max(18, total_leaves * 2.5)
+        
+        # Creiamo la figura con dimensioni adattate
+        plt.figure(figsize=(adjusted_width, adjusted_height), dpi=dpi)
+        
+        # Creiamo margini ampi nella figura per evitare sovrapposizioni
+        plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)  # Aumentato il margine superiore
+        
+        # Aggiungiamo titolo e legenda già qui, prima di disegnare l'albero
+        plt.title("Fuzzy Decision Tree", fontsize=fontsize+6, pad=30)  # Incrementato il padding del titolo
+        plt.axis('off')  # Nascondiamo gli assi
+
+        # Dizionario per memorizzare la posizione di ogni nodo
+        positions = {}
+        
+        # Calcoliamo le posizioni dei nodi
+        self._compute_node_positions(self.root, positions, max_depth, total_leaves)
+
+        margin = 0.05
+        plt.xlim(-margin, 1 + margin)
+        plt.ylim(-margin, 1 + margin)
+        
+        # Disegniamo l'albero
+        self._draw_tree(self.root, positions, fontsize)
+        
+        
+        # Creiamo la legenda per le classi
+        handles = []
+        for i, class_name in enumerate(self.class_names):
+            handle = plt.Line2D([0], [0], color=plt.cm.tab10(i), lw=0, marker='o', 
+                                markersize=10, label=class_name)
+            handles.append(handle)
+        
+        plt.legend(handles=handles, loc='upper right', fontsize=fontsize-1)
+        
+        # Mostriamo il grafico con più spazio tra i contenuti
+        plt.tight_layout(pad=4.0)
+        plt.show()
+
+    def _compute_node_positions(self, node, positions, max_depth, total_leaves, x_min=0, x_max=1, y=0):
+        """
+        Calcola le posizioni (x, y) di ogni nodo nell'albero con più spazio
+        
+        Args:
+            node: Nodo corrente
+            positions: Dizionario che mapperà nodo -> (x, y)
+            max_depth: Profondità massima dell'albero
+            total_leaves: Numero totale di foglie
+            x_min, x_max: Limiti dell'asse x per questo nodo
+            y: Posizione verticale del nodo
+        """
+        if node is None:
+            return
+            
+        # Il nodo corrente ha questa posizione
+        positions[node.id] = ((x_min + x_max) / 2, 1-y)
+        
+        # Se il nodo è una foglia o non ha figli, ci fermiamo
+        if node.is_leaf or len(node.children) == 0:
+            return
+            
+        # Aumentiamo lo spazio tra i livelli
+        # Invece di dividere uniformemente, diamo più spazio per alberi più profondi
+        level_height = 1.0 / (max_depth * 1.5 + 1)
+        
+        # Aggiungiamo un margine orizzontale tra i nodi figli
+        margin = 0.10
+        effective_width = (x_max - x_min) * (1 - margin * (len(node.children) - 1))
+        
+        # Calcoliamo la larghezza di base per ogni figlio
+        if len(node.children) > 0:
+            x_step = effective_width / len(node.children)
+        
+        for i, child in enumerate(node.children):
+            # Calcoliamo i limiti dell'asse x per questo figlio con margini
+            child_x_min = x_min + i * (x_step + margin * (x_max - x_min) / len(node.children))
+            child_x_max = child_x_min + x_step
+            
+            # Chiamata ricorsiva per il figlio
+            self._compute_node_positions(
+                child, positions, max_depth, total_leaves,
+                child_x_min, child_x_max, y + level_height
+            )
+        
+    def _get_max_depth(self, node):
+        """Calcola la profondità massima dell'albero"""
+        if node is None or len(node.children) == 0:
+            return 0
+        return 1 + max(self._get_max_depth(child) for child in node.children)
+
+    def _count_leaves(self, node):
+        """Conta il numero di foglie nell'albero"""
+        if node is None:
+            return 0
+        if node.is_leaf:
+            return 1
+        return sum(self._count_leaves(child) for child in node.children)
+
+    def _compute_node_positions(self, node, positions, max_depth, total_leaves, x_min=0, x_max=1, y=0):
+        """
+        Calcola le posizioni (x, y) di ogni nodo nell'albero
+        
+        Args:
+            node: Nodo corrente
+            positions: Dizionario che mapperà nodo -> (x, y)
+            max_depth: Profondità massima dell'albero
+            total_leaves: Numero totale di foglie
+            x_min, x_max: Limiti dell'asse x per questo nodo
+            y: Posizione verticale del nodo
+        """
+        if node is None:
+            return
+            
+        # Il nodo corrente ha questa posizione
+        positions[node.id] = ((x_min + x_max) / 2, 1-y)
+        
+        # Se il nodo è una foglia o non ha figli, ci fermiamo
+        if node.is_leaf or len(node.children) == 0:
+            return
+            
+        # Altezza di ogni livello
+        level_height = 1.0 / (max_depth + 1)
+        
+        # Per ogni figlio, calcoliamo la sua sezione dell'asse x
+        x_step = (x_max - x_min) / len(node.children)
+        
+        for i, child in enumerate(node.children):
+            # Calcoliamo i limiti dell'asse x per questo figlio
+            child_x_min = x_min + i * x_step
+            child_x_max = child_x_min + x_step
+            
+            # Chiamata ricorsiva per il figlio
+            self._compute_node_positions(
+                child, positions, max_depth, total_leaves,
+                child_x_min, child_x_max, y + level_height
+            )
+
+    def _draw_tree(self, node, positions, fontsize):
+        """
+        Disegna l'albero usando le posizioni calcolate
+        
+        Args:
+            node: Nodo corrente
+            positions: Dizionario con le posizioni dei nodi
+            fontsize: Dimensione del font per le etichette
+        """
+        if node is None or node.id not in positions:
+            return
+            
+        # Posizione del nodo corrente
+        x, y = positions[node.id]
+        
+        # Aspetto del nodo dipende se è una foglia o un nodo interno
+        if node.is_leaf:
+            # Determiniamo il colore in base alla classe più probabile
+            predicted_class = np.argmax(node.class_distribution)
+            confidence = node.class_distribution[predicted_class]
+            
+            # Il colore rappresenta la classe predetta, l'opacità la confidenza
+            node_color = plt.cm.tab10(predicted_class)
+            
+            # Disegniamo il nodo foglia con bordo più spesso
+            plt.scatter(x, y, s=300, alpha=confidence, color=node_color,
+                        edgecolors='black', linewidths=1.5, zorder=10)
+            
+            # Etichetta con la classe predetta e distribuzione completa
+            class_name = self.class_names[predicted_class] if predicted_class < len(self.class_names) else f"Class_{predicted_class}"
+            
+            # Aggiungiamo informazioni sul numero di campioni
+            samples_info = ""
+            if hasattr(node, 'samples_count') and node.samples_count is not None:
+                samples_info = f"Campioni: {node.samples_count}"
+                
+            # Gestione sicura per information_gain
+            gain_info = ""
+            if hasattr(node, 'information_gain') and node.information_gain is not None:
+                gain_info = f"Gain: {node.information_gain:.4f}"
+                
+            
+            # Creiamo una rappresentazione visiva della distribuzione delle classi
+            dist_str = ""
+            for i, prob in enumerate(node.class_distribution):
+                if prob > 0.01:  # Mostriamo solo le classi con probabilità significativa
+                    class_i = self.class_names[i] if i < len(self.class_names) else f"Class_{i}"
+                    dist_str += f"{class_i}: {prob:.2f}\n"
+            
+            label = f"{class_name}\n({confidence:.2f})\n{samples_info}\n{dist_str}"
+
+            vertical_offset = 30 if node.depth > 2 else 25
+            
+            plt.annotate(label, (x, y), xytext=(0, vertical_offset), textcoords='offset points',
+                        ha='center', va='bottom', fontsize=fontsize,
+                        bbox=dict(boxstyle='round,pad=0.7', alpha=0.15, fc='white'))
+        else:
+            # Nodo interno 
+            if node.feature >= 0:  # Non è il nodo radice
+                # Disegniamo il nodo interno con gradiente di colore basato sulla profondità
+                color_intensity = 0.7 - (node.depth * 0.1) if hasattr(node, 'depth') else 0.7
+                node_color = (0.7, 0.9, 1.0)  # Azzurro chiaro
+                
+                plt.scatter(x, y, s=250, color=node_color, edgecolors='blue', 
+                        linewidths=1.5, zorder=10)
+                
+                # Etichetta più informativa con nome feature e statistiche
+                feature_name = self.feature_names[node.feature]
+                short_name = feature_name if len(feature_name) < 20 else feature_name[:17] + "..."
+                
+                # Informazioni aggiuntive
+                samples_info = f"Campioni: {node.samples_count}" if hasattr(node, 'samples_count') else ""
+                gain_info = ""
+                if hasattr(node, 'information_gain') and node.information_gain is not None:
+                    gain_info = f"Gain: {node.information_gain:.4f}"
+                
+                node_label = f"{short_name}\n{samples_info}\n{gain_info}"
+
+                vertical_offset = 25 if node.depth > 1 else 20
+            
+                plt.annotate(node_label, (x, y), xytext=(0, vertical_offset), textcoords='offset points',
+                            ha='center', va='bottom', fontsize=fontsize,
+                            bbox=dict(boxstyle='round,pad=0.7', alpha=0.15, fc='white'))
+            else:
+                # Nodo radice con più informazioni
+                plt.scatter(x, y, s=300, color='lightgreen', edgecolors='darkgreen', 
+                        linewidths=2.0, zorder=10)
+                
+                # Informazioni sul dataset
+                samples_info = f"Campioni totali: {node.samples_count}" if hasattr(node, 'samples_count') else ""
+                classes_info = f"Classi: {self.n_classes}"
+                
+                root_label = f"Root\n{samples_info}\n{classes_info}"
+                plt.annotate(root_label, (x, y), xytext=(0, 25), textcoords='offset points',
+                            ha='center', va='bottom', fontsize=fontsize,
+                            bbox=dict(boxstyle='round,pad=0.7', alpha=0.15, fc='white'))
+        
+        # Disegniamo i collegamenti ai figli e processiamo ricorsivamente
+        for child in node.children:
+            if child.id in positions:
+                child_x, child_y = positions[child.id]
+                
+                # Disegniamo la linea tra il nodo corrente e il figlio
+                # Utilizziamo un gradiente di colore basato sulla profondità
+                edge_color = 'black'
+                edge_alpha = 0.6 - (node.depth * 0.05) if hasattr(node, 'depth') else 0.6
+                edge_alpha = max(0.3, edge_alpha)  # Non troppo trasparente
+                
+                plt.plot([x, child_x], [y, child_y], '-', color=edge_color, 
+                        alpha=edge_alpha, linewidth=1.2, zorder=5)
+                
+                # Se c'è un insieme fuzzy, aggiungiamo un'etichetta sulla linea
+                if child.fuzzy_set:
+                    # Punto medio sulla linea per posizionare l'etichetta
+                    mid_x = x + (child_x - x) * 0.4
+                    mid_y = y + (child_y - y) * 0.4
+                    
+                    # Estrai il termine linguistico
+                    fuzzy_term = FuzzyDecisionTree.extract_term(child.fuzzy_set)
+                    
+                    # Angolo della linea per allineare il testo
+                    angle = np.degrees(np.arctan2(child_y - y, child_x - x))
+                    if angle > 90:
+                        angle -= 180
+                    if angle < -90:
+                        angle += 180
+                    
+                    # Aggiungiamo l'etichetta ruotata con sfondo più visibile
+                    plt.annotate(fuzzy_term, (mid_x, mid_y), 
+                                ha='center', va='center', fontsize=fontsize-1,
+                                bbox=dict(boxstyle='round,pad=0.4', alpha=0.3, fc='white'),
+                                rotation=angle,
+                                xytext=(0,0),
+                                textcoords='offset points')
+                
+                # Chiamata ricorsiva per i figli
+                self._draw_tree(child, positions, fontsize)
