@@ -1,11 +1,26 @@
-"""
-Fuzzy Decision Tree Package - Un'implementazione di alberi decisionali con logica fuzzy
-"""
+from setuptools import setup, find_packages
 
-# Esporta le classi principali per renderle disponibili direttamente dal package
-from fuzzy_tree.fuzzy_decision_tree import FuzzyDecisionTree
-from fuzzy_tree.fuzzy_sets import FuzzyDiscretizer, create_triangular_fuzzy_sets
-from fuzzy_tree.fuzzy_node import FuzzyNode
-
-# Versione del package
-__version__ = '0.1.0'
+setup(
+    name="fuzzy-decision-tree",  # Usa direttamente il trattino per evitare conversioni
+    version="1.0.0",
+    packages=find_packages(),
+    install_requires=[
+        "numpy",
+        "pandas",
+        "scikit-learn",
+        "matplotlib",
+        "simpful"
+    ],
+    author="Riccardo",
+    description="Un albero decisionale fuzzy per classificazione",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/tuonome/fuzzy_tree",  # Aggiungi URL se disponibile
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    keywords="fuzzy, decision tree, machine learning",
+    python_requires=">=3.6",
+)

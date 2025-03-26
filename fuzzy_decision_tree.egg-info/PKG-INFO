@@ -1,5 +1,5 @@
-Metadata-Version: 2.1
-Name: fuzzy_tree
+Metadata-Version: 2.4
+Name: fuzzy_decision_tree
 Version: 1.0.0
 Summary: Un albero decisionale fuzzy per classificazione
 Author: Riccardo
@@ -11,3 +11,9 @@ Requires-Dist: pandas
 Requires-Dist: scikit-learn
 Requires-Dist: matplotlib
 Requires-Dist: simpful
+Dynamic: author
+Dynamic: keywords
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

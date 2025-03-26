@@ -1,8 +1,0 @@
-LICENSE
-README.md
-setup.py
-fuzzy_tree.egg-info/PKG-INFO
-fuzzy_tree.egg-info/SOURCES.txt
-fuzzy_tree.egg-info/dependency_links.txt
-fuzzy_tree.egg-info/requires.txt
-fuzzy_tree.egg-info/top_level.txt
