@@ -5,7 +5,7 @@ A fuzzy decision tree classifier for machine learning tasks.
 ## Installation
 
 ```bash
-pip install fuzzy-tree
+pip install fuzzy-decision-tree
 ```
 
 ## Usage
