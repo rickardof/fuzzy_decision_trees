@@ -55,7 +55,7 @@ class FuzzyDiscretizer:
 
 def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
     """
-    Crea insiemi fuzzy triangolari da una lista di punti
+    Crea insiemi fuzzy triangolari da una lista di punti con partizione forte
     
     Args:
         points: Lista di punti che definiscono la partizione
@@ -66,13 +66,13 @@ def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
     fuzzy_sets = []
     n_sets = len(points) - 1
     
-    # Nomi linguistici degli insiemi fuzzy
+    # Nomi linguistici degli insiemi fuzzy 
     linguistic_terms_7 = ["EXTREMELY LOW", "VERY LOW", "LOW", "MEDIUM", "HIGH", "VERY HIGH", "EXTREMELY HIGH"]
     linguistic_terms_5 = ["VERY_LOW", "LOW", "MEDIUM", "HIGH", "VERY_HIGH"]
     linguistic_terms_3 = ["LOW","MEDIUM","HIGH"]
     linguistic_terms_2 = ["LOW","HIGH"]
 
-    # Seleziona i termini linguistici appropriati in base al numero di insiemi
+    # Seleziona i termini linguistici appropriati (come prima)
     if n_sets == 7:
         linguistic_terms = linguistic_terms_7
     elif n_sets == 5:
@@ -82,7 +82,6 @@ def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
     elif n_sets == 2:
         linguistic_terms = linguistic_terms_2
     else:
-        # Per altri valori di n_sets, generiamo nomi numerici
         linguistic_terms = [f"FS_{i}" for i in range(n_sets)]
     
     for i in range(n_sets):
@@ -93,14 +92,14 @@ def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
             c = points[i + 1]
         # Per l'ultimo insieme (bordo destro)
         elif i == n_sets - 1:
-            a = points[i]
-            b = points[i + 1]
-            c = points[i + 1]
+            a = points[i - 1]  
+            b = points[i]
+            c = points[i]
         # Per gli insiemi interni
         else:
-            a = points[i]
-            b = (points[i] + points[i + 1]) / 2
-            c = points[i + 1]
+            a = points[i - 1]  
+            b = points[i]      
+            c = points[i + 1]  
             
         term = linguistic_terms[i] if i < len(linguistic_terms) else f"FS_{i}"
         fs = FuzzySet(function=Triangular_MF(a=a, b=b, c=c), term=term)
