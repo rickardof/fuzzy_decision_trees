@@ -4,17 +4,17 @@ from simpful import FuzzySet
 
 class FuzzyNode:
     """
-    Nodo dell'albero decisionale fuzzy per classificazione.
+    Fuzzy decision tree node.
     
-    Ogni nodo rappresenta o un test fuzzy su una feature (nodo interno) 
-    o una distribuzione di probabilità delle classi (nodo foglia).
+    Each node represents either a fuzzy set on a feature (internal node)
+    or a probability distribution of classes (leaf node).
     """
     
     __LAST_ID = 0
     
     @staticmethod
     def reset_node_id():
-        """Resetta il contatore degli ID dei nodi"""
+        """Resets the node ID counter""" #for when creating multiple trees or retraining the model
         FuzzyNode.__LAST_ID = 0
     
     def __init__(self, 
@@ -24,15 +24,16 @@ class FuzzyNode:
                  depth: int = 0, 
                  parent = None):
         """
-        Inizializza un nodo dell'albero decisionale fuzzy
+        Initializes a fuzzy decision tree node
         
         Args:
-            feature: Indice della feature testata dal nodo (-1 per nodo radice o foglia)
-            feature_name: Nome della feature (per interpretabilità)
-            fuzzy_set: Insieme fuzzy usato per testare la feature
-            depth: Profondità del nodo nell'albero
-            parent: Nodo genitore
+            feature: Index of the feature tested by the node (-1 for root or leaf node)
+            feature_name: Name of the feature (for interpretability)
+            fuzzy_set: Fuzzy set used to test the feature
+            depth: Depth of the node in the tree
+            parent: Parent node
         """
+
         FuzzyNode.__LAST_ID += 1
         self.id = FuzzyNode.__LAST_ID
         self.feature = feature
@@ -41,14 +42,14 @@ class FuzzyNode:
         self.depth = depth
         self.parent = parent
         
-        # Relazioni dell'albero
+        # tree's relationships
         self.children = []
         self.is_leaf = False
         
-        # Per i nodi foglia (classificazione)
+        # for leaf nodes 
         self.class_distribution = None
         
-        # Statistiche per la costruzione dell'albero
+        # stats for tree construction
         self.information_gain = None
         self.samples_count = 0
         self.samples_above_threshold = 0
@@ -56,26 +57,28 @@ class FuzzyNode:
         self.mean_activation_force = None
     
     def add_child(self, node):
-        """Aggiunge un nodo figlio"""
+        """Add a child node to the tree
+            node: 'FuzzyNode'
+        """
         self.children.append(node)
     
     def mark_as_leaf(self, class_distribution=None):
         """
-        Marca il nodo come foglia e imposta la distribuzione di classe
+        Marks the node as a leaf and sets the class distribution
         
         Args:
-            class_distribution: Distribuzione di probabilità delle classi [p(c1), p(c2), ...]
-        """
+            class_distribution: [np.darray], Probability distribution of classes [p(c1), p(c2), ...]
+    """
         self.is_leaf = True
         self.class_distribution = class_distribution
     
     def get_rule_path(self) -> List[Tuple[str, str]]:
         """
-        Genera una rappresentazione testuale del percorso dalla radice a questo nodo
+        Generates a textual representation of the path from the root to this node
         
         Returns:
-            Lista di tuple (feature_name, term) che rappresentano il percorso
-        """
+            List of tuples (feature_name, term) representing the path
+    """
         if self.parent is None:
             return []
             
@@ -86,29 +89,29 @@ class FuzzyNode:
     
     def membership_degree(self, x: np.ndarray) -> float:
         """
-        Calcola il grado di appartenenza di un esempio all'insieme fuzzy del nodo
+    Calculates the membership degree of an example to the node's fuzzy set
+    
+    Args:
+        x: Feature vector
         
-        Args:
-            x: Vettore delle feature
-            
-        Returns:
-            Grado di appartenenza [0,1]
-        """
+    Returns:
+        Membership degree [0,1]
+    """
         if self.fuzzy_set is None:
-            return 1.0  # Nodo radice o senza insieme fuzzy
+            return 1.0  # root or node without fuzzy set
         
         try:
             return self.fuzzy_set.get_value(x[self.feature])
         except Exception as e:
-            print(f"Errore nel calcolo del grado di appartenenza: {e}")
+            print(f"Error while computing membership dregree: {e}")
             return 0.0
     
 
     
     def __str__(self):
-        """Rappresentazione testuale del nodo"""
+        """Textual representation of the node"""
         if self.is_leaf:
-            return f"Foglia(id={self.id}, prof={self.depth}, distr={self.class_distribution})"
+            return f"Leaf(id={self.id}, depth={self.depth}, distr={self.class_distribution})"
         else:
             fuzzy_term = self.fuzzy_set.term if self.fuzzy_set else "ROOT"
-            return f"Nodo(id={self.id}, prof={self.depth}, feature={self.feature_name}, term={fuzzy_term})"
+            return f"Node(id={self.id}, depth={self.depth}, feature={self.feature_name}, term={fuzzy_term})"

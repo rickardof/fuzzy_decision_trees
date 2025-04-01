@@ -1,33 +1,37 @@
-# src/utils/fuzzy_sets.py
+
 from typing import List, Tuple, Dict
 import numpy as np
 from simpful import FuzzySet, Triangular_MF
 
 class FuzzyDiscretizer:
-    """Crea partizioni fuzzy per feature continue"""
+    """Creates fuzzy partitions for continuous features"""
     
     def __init__(self, num_fuzzy_sets: int, method: str = "uniform"):
         """
-        Inizializza il discretizzatore fuzzy
+        Initializes the fuzzy discretizer
         
         Args:
-            num_fuzzy_sets: Numero di insiemi fuzzy per feature
-            method: Metodo di discretizzazione ('uniform' o 'quantile')
-        """
+            num_fuzzy_sets: Number of fuzzy sets per feature
+            method: Discretization method ('uniform' or 'quantile')
+    """
         self.num_fuzzy_sets = num_fuzzy_sets
         self.method = method
         
     def run(self, X: np.ndarray, features_to_discretize: List[bool]) -> List[List[float]]:
         """
-        Calcola i punti di divisione per le feature selezionate
+        Calculates the division points for the selected features
         
         Args:
-            X: Dati di input (numpy array)
-            features_to_discretize: Lista di booleani che indica quali feature discretizzare
+            X: Input data (numpy array)
+            features_to_discretize: List of booleans indicating which features to discretize
             
         Returns:
-            Lista di liste, ogni lista contiene i punti di divisione per una feature
-        """
+            List of lists, each list contains division points for a feature
+    """
+            # Validate inputs
+        if X is None or X.size == 0:
+            raise ValueError("Input data X cannot be empty")
+
         splits = []
         n_features = X.shape[1]
         
@@ -38,14 +42,14 @@ class FuzzyDiscretizer:
                 max_val = np.max(feature_values)
                 
                 if self.method == "uniform":
-                    # Divisione uniforme dell'intervallo
+                    # uniform division of the interval
                     points = np.linspace(min_val, max_val, self.num_fuzzy_sets + 1)
                 elif self.method == "quantile":
-                    # Divisione basata sui quantili
+                    # quantile based
                     points = np.percentile(feature_values, 
                                           np.linspace(0, 100, self.num_fuzzy_sets + 1))
                 else:
-                    raise ValueError(f"Metodo non supportato: {self.method}")
+                    raise ValueError(f"Method not supported: {self.method}")
                 
                 splits.append(points.tolist())
             else:
@@ -55,24 +59,34 @@ class FuzzyDiscretizer:
 
 def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
     """
-    Crea insiemi fuzzy triangolari da una lista di punti con partizione forte
-    
-    Args:
-        points: Lista di punti che definiscono la partizione
+        Creates triangular fuzzy sets from a list of points with strong partition
         
-    Returns:
-        Lista di insiemi fuzzy (oggetti FuzzySet di Simpful)
+        Args:
+            points: List of points defining the partition
+            
+        Returns:
+            List of fuzzy sets (Simpful FuzzySet objects)
     """
+
+    if len(points) < 2:
+        raise ValueError("Points list must contain at least 2 points to create fuzzy sets")
+    
+    # Check for non-numeric values
+    try:
+        [float(p) for p in points]
+    except (TypeError, ValueError):
+        raise ValueError("All points must be numeric values")
+
     fuzzy_sets = []
     n_sets = len(points) - 1
     
-    # Nomi linguistici degli insiemi fuzzy 
+    # linguistic names for the terms, chosen arbitrarily for 2
     linguistic_terms_7 = ["EXTREMELY LOW", "VERY LOW", "LOW", "MEDIUM", "HIGH", "VERY HIGH", "EXTREMELY HIGH"]
     linguistic_terms_5 = ["VERY_LOW", "LOW", "MEDIUM", "HIGH", "VERY_HIGH"]
     linguistic_terms_3 = ["LOW","MEDIUM","HIGH"]
     linguistic_terms_2 = ["LOW","HIGH"]
 
-    # Seleziona i termini linguistici appropriati (come prima)
+    
     if n_sets == 7:
         linguistic_terms = linguistic_terms_7
     elif n_sets == 5:
@@ -85,17 +99,17 @@ def create_triangular_fuzzy_sets(points: List[float]) -> List[FuzzySet]:
         linguistic_terms = [f"FS_{i}" for i in range(n_sets)]
     
     for i in range(n_sets):
-        # Per il primo insieme (bordo sinistro)
+        # first set (left border)
         if i == 0:
             a = points[i]
             b = points[i]
             c = points[i + 1]
-        # Per l'ultimo insieme (bordo destro)
+        # last set (right border)
         elif i == n_sets - 1:
             a = points[i - 1]  
             b = points[i]
             c = points[i]
-        # Per gli insiemi interni
+        # internal sets
         else:
             a = points[i - 1]  
             b = points[i]      
